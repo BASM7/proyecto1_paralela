@@ -1,8 +1,10 @@
 class Worm:
     luminescence = 0
     position = 0
-    adaptation = 0
+    fitness = 0
     radius = 0
+    neighbors = []
+    internal_distance = 0
 
     def __init__(self, new_luminescence, new_position, new_radius):
         self.luminescence = new_luminescence

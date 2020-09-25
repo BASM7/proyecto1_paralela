@@ -1,17 +1,19 @@
 import sys
 import getopt
+import numpy as np
 from worm import Worm
 from mpi4py import MPI
 
 
 def load_data(filename):
-    loaded_data = []
     f = open(filename, "r")
     filas = f.readlines()
-    for fila in filas:
+    print(filas)
+    loaded_data = np.zeros(shape=(len(filas), 10))
+    for i, fila in enumerate(filas):
         tlist = [int(s) for s in fila.__str__().split(',')]
-        tlist = tlist[0:-1]
-        loaded_data.append(tlist)
+        alist = np.array(tlist[0:-1])
+        loaded_data[i] = alist
     return loaded_data
 
 
@@ -41,12 +43,23 @@ def get_command_line_values(argv):
     return int(r_str), int(g_str), int(s_str), int(i_str), int(l_str)
 
 
+def euclidean_distance(v, u):
+    return np.linalg.norm(v - u)
+
+
 def main():
     list_data = load_data("poker-hand-training-true.data")
-    for plist in list_data:
-        print(plist)
+
+    # print(list_data)
+
+    first_data = list_data[0]
+    for i, data in enumerate(list_data):
+        print(i, ' : ', euclidean_distance(first_data, data))
+
+    # a = np.array([1, 1, 4, 10, 4, 6, 2, 3, 3, 4])
+    # b = np.array([4, 1, 4, 10, 2, 6, 4, 3, 2, 4])
+    # c = np.array([1, 6, 4, 1, 4, 11, 2, 2, 3, 5])
 
 
 if __name__ == '__main__':
     main()
-
