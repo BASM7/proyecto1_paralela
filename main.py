@@ -179,12 +179,13 @@ def main(argv):
         data_point = kdimentional_tree_closest_point(tree, worm.position)
         list_neighbors = get_neighbors(tree, data_point)
 
+        # DEBUG
         """
         print(index, ' : ', worm.position, ' closest neighbors: ')        
         for line in list_neighbors:
             print(line, ' : ', euclidean_distance(line, data_point))
         print('---')
-        """
+        # """
 
     # first_data = np.array([1, 10, 1, 8, 2, 3, 2, 7, 3, 4.7])
     # pp.pprint(kdimentional_tree_closest_point(tree, first_data))
