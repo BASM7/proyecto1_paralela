@@ -111,14 +111,28 @@ def create_swarm(list_data, starting_luminicesce, radius):
     return swarm
 
 
-def get_neighbors(root, data_point, list_neighbors=None):
+def get_neighbors(root, data_point, depth=0, list_neighbors=None):
     if list_neighbors is None:
         list_neighbors = []
     if root is not None:
         if euclidean_distance(root['node'], data_point) <= 4:
             list_neighbors.append(root['node'])
-        get_neighbors(root['left'], data_point, list_neighbors)
-        get_neighbors(root['right'], data_point, list_neighbors)
+
+        left_tree = root['left']
+        right_tree = root['right']
+
+        splitting_axis = depth % 10
+
+        if data_point[splitting_axis] < root['node'][splitting_axis]:
+            get_neighbors(left_tree, data_point, depth + 1, list_neighbors)
+            opposite_subtree = right_tree
+        else:
+            get_neighbors(right_tree, data_point, depth + 1, list_neighbors)
+            opposite_subtree = left_tree
+        if opposite_subtree is not None:
+            if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= 4:
+                get_neighbors(opposite_subtree, data_point, depth + 1, list_neighbors)
+
     return list_neighbors
 
 
@@ -163,8 +177,14 @@ def main(argv):
     for index in range(min_index, max_index):
         worm = swarm[index]
         data_point = kdimentional_tree_closest_point(tree, worm.position)
-        # print(worm.position, ' closest neighbors: ')
         list_neighbors = get_neighbors(tree, data_point)
+
+        """
+        print(index, ' : ', worm.position, ' closest neighbors: ')        
+        for line in list_neighbors:
+            print(line, ' : ', euclidean_distance(line, data_point))
+        print('---')
+        """
 
     # first_data = np.array([1, 10, 1, 8, 2, 3, 2, 7, 3, 4.7])
     # pp.pprint(kdimentional_tree_closest_point(tree, first_data))
