@@ -14,7 +14,8 @@ from mpi4py import MPI
 
 pp = pprint.PrettyPrinter(indent=4)
 # FILE_DATA = "poker-hand-training-true.data"
-FILE_DATA = "test.data"
+# FILE_DATA = "test.data"
+FILE_DATA = "testSwarm.data"
 
 
 # FILE_DATA = "mini_test.data"
@@ -141,8 +142,8 @@ def get_starting_neighbors(root, data_point, depth=0, list_neighbors=None):
     return list_neighbors
 
 
-def start_neighbors(tree, data_point, worm):
-    worm.neighbors = get_starting_neighbors(tree, data_point)
+def start_neighbors(tree, worm):
+    worm.neighbors = get_starting_neighbors(tree, worm.position)
 
 
 def main(argv):
@@ -179,14 +180,16 @@ def main(argv):
     # Etapa de inicializacion
     for index in range(min_index, max_index):
         worm = swarm[index]
-        data_point = kdimentional_tree_closest_point(tree, worm.position)
-        start_neighbors(tree, data_point, worm)
+        # data_point = kdimentional_tree_closest_point(tree, worm.position)
+        start_neighbors(tree, worm)
         update_intra_distance(worm)
-        # DEBUG
-        # print(index, ' : ', worm.position, ' closest neighbors: ')
-        # for neighbor in worm.neighbors:
-        #     print(neighbor, ' : ', euclidean_distance(neighbor, data_point))
-        # print('---')
+
+        print(index, ' : ', worm.position, ' closest neighbors: ')
+        for neighbor in worm.neighbors:
+            print(neighbor, ' : ', euclidean_distance(neighbor, worm.position))
+        print('---')
+
+    # All worms are initialized.
 
     t_final = MPI.Wtime()
     tw = comm.allreduce(t_final - t_start, op=MPI.MAX)
