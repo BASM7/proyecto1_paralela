@@ -22,9 +22,6 @@ class Worm:
 
 
 def main():
-    """
-    Código solo para probar la sobrecarga de print().
-    """
     x = np.zeros(10)
     new_worm = Worm(45, x, 4)
     print(new_worm)

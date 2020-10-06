@@ -13,10 +13,10 @@ from worm import Worm
 from mpi4py import MPI
 
 pp = pprint.PrettyPrinter(indent=4)
-# FILE_DATA = "poker-hand-training-true.data"
+FILE_DATA = "poker-hand-training-true.data"
 # FILE_DATA = "test.data"
 # FILE_DATA = "mini_test.data"
-FILE_DATA = "tiny_mini_test.data"
+# FILE_DATA = "tiny_mini_test.data"
 
 
 def get_command_line_values(argv):
@@ -183,12 +183,13 @@ def main(argv):
         worm = swarm[index]
         # data_point = kdimentional_tree_closest_point(tree, worm.position)
         start_neighbors(tree, worm)
-        update_intra_distance(worm)
+        # update_intra_distance(worm)
 
         # print(index, ' : ', worm.position, ' closest neighbors: ')
         # for neighbor in worm.neighbors:
         #     print(neighbor, ' : ', euclidean_distance(neighbor, worm.position))
         # print('---')
+        # print(len(worm.neighbors))
 
     # All worms are initialized.
 
