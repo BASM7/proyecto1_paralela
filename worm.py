@@ -7,12 +7,16 @@ class Worm:
         self.radius = new_radius
         self.fitness = 0
         self.internal_distance = 0
-        self.neighbors = np.empty([])
+        self.neighbors = None
         self.position = new_position
 
     def add_neighbor(self, new_neighbor):
         self.neighbors = np.append(self.neighbors, new_neighbor)
 
+    def __len__(self):
+        return len(self.neighbors) if self.neighbors is not None else 0
+
+    # Deprecated method. TODO remove.
     def __getitem__(self, index):
         return self.position
 

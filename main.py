@@ -175,13 +175,9 @@ def main(argv):
     min_index = int((pid * len(swarm) / size))
     max_index = int((pid + 1) * len(swarm) / size)
 
-    list_centroid_candidates = []
-    list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
-
     # Etapa de inicializacion
     for index in range(min_index, max_index):
         worm = swarm[index]
-        # data_point = kdimentional_tree_closest_point(tree, worm.position)
         start_neighbors(tree, worm)
         # update_intra_distance(worm)
 
@@ -191,10 +187,21 @@ def main(argv):
         # print('---')
         # print(len(worm.neighbors))
 
+    # ordenar el enjambre.
+    if pid == 0:
+        swarm.sort(key=lambda x: len(x), reverse=True)
+        swarm = comm.bcast(swarm, 0)
+
+    print(len(swarm[0]))
+
+    list_centroid_candidates = []
+    list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
+
     # All worms are initialized.
 
     t_final = MPI.Wtime()
     tw = comm.allreduce(t_final - t_start, op=MPI.MAX)
+
     if pid == 0:
         pp.pprint(tw)
     return
