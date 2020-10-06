@@ -115,7 +115,7 @@ def create_swarm(list_data, starting_luminicesce, radius):
     return swarm
 
 
-def get_starting_neighbors(root, data_point, depth=0, list_neighbors=None):
+def get_starting_covered_data(root, data_point, depth=0, list_neighbors=None):
     if list_neighbors is None:
         list_neighbors = []
     if root is not None:
@@ -128,20 +128,36 @@ def get_starting_neighbors(root, data_point, depth=0, list_neighbors=None):
         splitting_axis = depth % 10
 
         if data_point[splitting_axis] < root['node'][splitting_axis]:
-            get_starting_neighbors(left_tree, data_point, depth + 1, list_neighbors)
+            get_starting_covered_data(left_tree, data_point, depth + 1, list_neighbors)
             opposite_subtree = right_tree
         else:
-            get_starting_neighbors(right_tree, data_point, depth + 1, list_neighbors)
+            get_starting_covered_data(right_tree, data_point, depth + 1, list_neighbors)
             opposite_subtree = left_tree
         if opposite_subtree is not None:
             if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= 4:
-                get_starting_neighbors(opposite_subtree, data_point, depth + 1, list_neighbors)
+                get_starting_covered_data(opposite_subtree, data_point, depth + 1, list_neighbors)
 
     return list_neighbors
 
 
-def start_neighbors(tree, worm):
-    worm.neighbors = get_starting_neighbors(tree, worm.position)
+def get_starting_centroid_list(swarm):
+    staring_centroid_list = []
+    pos_average = None
+    for index, worm in enumerate(swarm):
+        if pos_average is None:
+            staring_centroid_list.append(index)
+            pos_average = worm.position
+        else:
+            distance = euclidean_distance(pos_average, worm.position)
+            if distance >= 4:
+                cant_centroids = len(staring_centroid_list)
+                pos_average = ((pos_average * cant_centroids) + worm.position) / (cant_centroids + 1)
+                staring_centroid_list.append(index)
+    return staring_centroid_list
+
+
+def start_covered_data(tree, worm):
+    worm.neighbors_worms = get_starting_covered_data(tree, worm.position)
 
 
 def main(argv):
@@ -164,6 +180,8 @@ def main(argv):
             get_command_line_values(argv)
         list_data = load_data(FILE_DATA)
         tree = build_kdimentional_tree(list_data)
+
+        # TODO: paralelizar creacion de enjambre.
         swarm = create_swarm(list_data, starting_luciferin, radius)
 
     t_start = MPI.Wtime()
@@ -178,8 +196,8 @@ def main(argv):
     # Etapa de inicializacion
     for index in range(min_index, max_index):
         worm = swarm[index]
-        start_neighbors(tree, worm)
-        # update_intra_distance(worm)
+        start_covered_data(tree, worm)
+        update_intra_distance(worm)
 
         # print(index, ' : ', worm.position, ' closest neighbors: ')
         # for neighbor in worm.neighbors:
@@ -187,15 +205,33 @@ def main(argv):
         # print('---')
         # print(len(worm.neighbors))
 
+    list_centroid_candidates = []
+
     # ordenar el enjambre.
     if pid == 0:
         swarm.sort(key=lambda x: len(x), reverse=True)
-        swarm = comm.bcast(swarm, 0)
+        list_centroid_candidates = get_starting_centroid_list(swarm)
 
-    print(len(swarm[0]))
+        print('cantidad de centroides:', len(list_centroid_candidates))
+        # print('SSE:', calculate_sum_squared_errors(swarm, list_centroid_candidates))
 
-    list_centroid_candidates = []
-    list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
+
+        
+
+
+    # comm.Barrier()
+    swarm, list_centroid_candidates = comm.bcast((swarm, list_centroid_candidates), 0)
+
+    # calcular SSE.
+
+    # SSE
+    # InterD
+
+    # Fin de etapa de inicializacion.
+
+    # while len(list_centroid_cantidates) > 10
+
+    # swarm = comm.bcast(swarm, 0)
 
     # All worms are initialized.
 
