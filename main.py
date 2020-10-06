@@ -15,10 +15,8 @@ from mpi4py import MPI
 pp = pprint.PrettyPrinter(indent=4)
 # FILE_DATA = "poker-hand-training-true.data"
 # FILE_DATA = "test.data"
-FILE_DATA = "testSwarm.data"
-
-
 # FILE_DATA = "mini_test.data"
+FILE_DATA = "tiny_mini_test.data"
 
 
 def get_command_line_values(argv):
@@ -177,6 +175,9 @@ def main(argv):
     min_index = int((pid * len(swarm) / size))
     max_index = int((pid + 1) * len(swarm) / size)
 
+    list_centroid_candidates = []
+    list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
+
     # Etapa de inicializacion
     for index in range(min_index, max_index):
         worm = swarm[index]
@@ -184,10 +185,10 @@ def main(argv):
         start_neighbors(tree, worm)
         update_intra_distance(worm)
 
-        print(index, ' : ', worm.position, ' closest neighbors: ')
-        for neighbor in worm.neighbors:
-            print(neighbor, ' : ', euclidean_distance(neighbor, worm.position))
-        print('---')
+        # print(index, ' : ', worm.position, ' closest neighbors: ')
+        # for neighbor in worm.neighbors:
+        #     print(neighbor, ' : ', euclidean_distance(neighbor, worm.position))
+        # print('---')
 
     # All worms are initialized.
 
