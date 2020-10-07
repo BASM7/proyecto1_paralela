@@ -14,6 +14,8 @@ from mpi4py import MPI
 
 pp = pprint.PrettyPrinter(indent=4)
 FILE_DATA = "poker-hand-training-true.data"
+
+
 # FILE_DATA = "test.data"
 # FILE_DATA = "mini_test.data"
 # FILE_DATA = "tiny_mini_test.data"
@@ -115,11 +117,11 @@ def create_swarm(list_data, starting_luminicesce, radius):
     return swarm
 
 
-def get_starting_covered_data(root, data_point, depth=0, list_neighbors=None):
+def get_starting_covered_data(root, data_point, radius, depth=0, list_neighbors=None):
     if list_neighbors is None:
         list_neighbors = []
     if root is not None:
-        if euclidean_distance(root['node'], data_point) <= 4:
+        if euclidean_distance(root['node'], data_point) <= radius:
             list_neighbors.append(root['node'])
 
         left_tree = root['left']
@@ -128,41 +130,49 @@ def get_starting_covered_data(root, data_point, depth=0, list_neighbors=None):
         splitting_axis = depth % 10
 
         if data_point[splitting_axis] < root['node'][splitting_axis]:
-            get_starting_covered_data(left_tree, data_point, depth + 1, list_neighbors)
+            get_starting_covered_data(left_tree, data_point, radius, depth + 1, list_neighbors)
             opposite_subtree = right_tree
         else:
-            get_starting_covered_data(right_tree, data_point, depth + 1, list_neighbors)
+            get_starting_covered_data(right_tree, data_point, radius, depth + 1, list_neighbors)
             opposite_subtree = left_tree
         if opposite_subtree is not None:
-            if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= 4:
-                get_starting_covered_data(opposite_subtree, data_point, depth + 1, list_neighbors)
+            if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= radius:
+                get_starting_covered_data(opposite_subtree, data_point, radius, depth + 1, list_neighbors)
 
     return list_neighbors
 
 
 def get_starting_centroid_list(swarm):
-    staring_centroid_list = []
-    pos_average = None
+    starting_centroid_list = []
     for index, worm in enumerate(swarm):
-        if pos_average is None:
-            staring_centroid_list.append(index)
-            pos_average = worm.position
+        if not starting_centroid_list:
+            starting_centroid_list.append(index)
         else:
-            distance = euclidean_distance(pos_average, worm.position)
-            if distance >= 4:
-                cant_centroids = len(staring_centroid_list)
-                pos_average = ((pos_average * cant_centroids) + worm.position) / (cant_centroids + 1)
-                staring_centroid_list.append(index)
-    return staring_centroid_list
+            valid = True
+            for temp_index in starting_centroid_list:
+                distance = euclidean_distance(swarm[temp_index].position, worm.position)
+                if distance < worm.radius:
+                    valid = False
+                    break
+            if valid:
+                starting_centroid_list.append(index)
+    return starting_centroid_list
 
 
 def start_covered_data(tree, worm):
-    worm.neighbors_worms = get_starting_covered_data(tree, worm.position)
+    return get_starting_covered_data(tree, worm.position, worm.radius)
+
+
+def clean_swarm(swarm):
+    for index, worm in enumerate(swarm):
+        if worm.covered_data is None:
+            del swarm[index]
+    return swarm
 
 
 def main(argv):
     comm = MPI.COMM_WORLD
-    pid = comm.Get_rank()
+    rank = comm.Get_rank()
     size = comm.Get_size()
 
     list_data = []
@@ -175,7 +185,7 @@ def main(argv):
     radius = 0.0
     starting_luciferin = 0.0
 
-    if pid == 0:
+    if rank == 0:
         lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin = \
             get_command_line_values(argv)
         list_data = load_data(FILE_DATA)
@@ -185,60 +195,59 @@ def main(argv):
         swarm = create_swarm(list_data, starting_luciferin, radius)
 
     t_start = MPI.Wtime()
+
     list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin = \
         comm.bcast((
             list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin),
             0)
 
-    min_index = int((pid * len(swarm) / size))
-    max_index = int((pid + 1) * len(swarm) / size)
+    min_index = int((rank * len(swarm) / size))
+    max_index = int((rank + 1) * len(swarm) / size)
 
     # Etapa de inicializacion
     for index in range(min_index, max_index):
         worm = swarm[index]
-        start_covered_data(tree, worm)
-        update_intra_distance(worm)
-
-        # print(index, ' : ', worm.position, ' closest neighbors: ')
-        # for neighbor in worm.neighbors:
-        #     print(neighbor, ' : ', euclidean_distance(neighbor, worm.position))
-        # print('---')
-        # print(len(worm.neighbors))
+        worm.covered_data = start_covered_data(tree, worm)
+        worm.internal_distance = calculate_intra_distance(worm)
 
     list_centroid_candidates = []
-
     # ordenar el enjambre.
-    if pid == 0:
-        swarm.sort(key=lambda x: len(x), reverse=True)
+    sum_squared_errors = 0
+    if rank == 0:
+        swarm = clean_swarm(swarm)
+        swarm = sorted(swarm, key=lambda x: len(x), reverse=True)
         list_centroid_candidates = get_starting_centroid_list(swarm)
+        sum_squared_errors = calculate_sum_squared_errors(swarm, list_centroid_candidates)
 
-        print('cantidad de centroides:', len(list_centroid_candidates))
-        # print('SSE:', calculate_sum_squared_errors(swarm, list_centroid_candidates))
+    comm.Barrier()
+    swarm, list_centroid_candidates, sum_squared_errors = \
+        comm.bcast((swarm, list_centroid_candidates, sum_squared_errors), 0)
 
+    # iteration = 0
+    # while len(list_centroid_candidates) > 10 and iteration < 1000:
 
-        
+    max_internal_dist = 0
+    if rank == 0:
+        print('cantidad inicial de centroides: ', len(list_centroid_candidates))
+        max_internal_dist = calculate_max_internal_distance(swarm, list_centroid_candidates)
 
+    comm.Barrier()
+    max_internal_dist = comm.bcast(max_internal_dist, root=0)
+
+    for index in range(max_index, max_index):
+        worm = swarm[index]
+        worm.fitness = calculate_fitness(worm, sum_squared_errors, max_internal_dist, len(list_data))
 
     # comm.Barrier()
-    swarm, list_centroid_candidates = comm.bcast((swarm, list_centroid_candidates), 0)
+    # list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
 
-    # calcular SSE.
-
-    # SSE
-    # InterD
-
-    # Fin de etapa de inicializacion.
-
-    # while len(list_centroid_cantidates) > 10
-
-    # swarm = comm.bcast(swarm, 0)
-
-    # All worms are initialized.
+    if rank == 0:
+        print('cantidad siguiente de centroides: ', len(list_centroid_candidates))
 
     t_final = MPI.Wtime()
     tw = comm.allreduce(t_final - t_start, op=MPI.MAX)
 
-    if pid == 0:
+    if rank == 0:
         pp.pprint(tw)
     return
 
