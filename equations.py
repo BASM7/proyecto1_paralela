@@ -1,4 +1,6 @@
 import numpy as np
+from worm import Worm
+from decimal import *
 
 
 def euclidean_distance(vector1, vector2):
@@ -7,15 +9,14 @@ def euclidean_distance(vector1, vector2):
 
 def calculate_intra_distance(worm):
     sum_total = 0
-    if worm.covered_data is not None:
+    if worm.covered_data is not None and len(worm.covered_data) > 0:
         sum_total = sum([euclidean_distance(data_point, worm.position) for data_point in worm.covered_data])
     return sum_total
 
 
-def calculate_sum_squared_errors(swarm, centroids_list):
+def calculate_sum_squared_errors(centroids_list):
     sum_total = 0
-    for index in centroids_list:
-        worm = swarm[index]
+    for worm in centroids_list:
         worm_pos = worm.position
         sum_temp = 0
         if worm.covered_data is not None:
@@ -25,55 +26,56 @@ def calculate_sum_squared_errors(swarm, centroids_list):
     return sum_total
 
 
-def calculate_inter_centroid_distance(swarm, centroid_list):
+def calculate_inter_centroid_distance(centroid_list):
     sum_total = 0
-    for centroid_index in centroid_list:
-        for second_centroid_index in centroid_list:
-            sum_total += (euclidean_distance(swarm[centroid_index].position,
-                                             swarm[second_centroid_index].position) ** 2)
+    for centroid in centroid_list:
+        for second_centroid in centroid_list:
+            sum_total += (euclidean_distance(centroid.position, second_centroid.position) ** 2)
     return sum_total
 
 
-def calculate_max_internal_distance(swarm, centroid_list):
+def calculate_max_internal_distance(centroid_list):
     max_internal_dist = 0
-    for index in centroid_list:
-        worm = swarm[index]
+    for worm in centroid_list:
         if worm.internal_distance > max_internal_dist:
             max_internal_dist = worm.internal_distance
     return max_internal_dist
 
 
-def calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data):
-    nominator = (1 / cant_data) * len(worm)
-    demoninator = sum_squared_errors * (worm.internal_distance / max_internal_dist)
-    return nominator / demoninator
+def calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist):
+    nominator = inter_dist * (1 / cant_data) * len(worm)
+    denominator = sum_squared_errors * (worm.internal_distance / max_internal_dist)
+
+    return nominator / denominator
 
 
-def calculate_luciferin(previous_luciferin, luciferin_constant_decay, luciferin_enhancement_fraction):
+def calculate_luciferin(worm, constant_decay, enhancement_fraction):
+    return (1 - constant_decay) * worm.luciferin + enhancement_fraction * worm.fitness
+
+
+def calculate_probability(worm1, worm2):
     pass
 
 
+def calculate_new_position(worm, brightest_neighbor, worm_step):
+    brightest_neighbor: Worm
+    new_position = worm.position
+    if brightest_neighbor is not None:
+        distance = euclidean_distance(worm.position, brightest_neighbor.position)
+        if distance != 0:
+            difference = np.subtract(brightest_neighbor.position, worm.position)
+            fraction = worm_step / distance
+            summand = np.multiply(difference, fraction)
+            new_position = np.add(worm.position, summand)
+    return new_position
+
+
+# def calculate_new_position(worm, brightest_neighbor, worm_step):
+#     brightest_neighbor: Worm
+#     new_position = worm.position
 def main():
-    array1 = np.array([2.6006387, 8.22735151, 2.59879434, 5.44134471, 1.74145815, 10.56438908,
-                       3.58889295, 5.43374375, 1.82441594, 10.69579439])
-
-    array2 = np.array([1.76302288, 8.45526787, 2.08559538, 7.68420067, 2.9355501, 10.92414194,
-                       3.48622029, 5.16347038, 1.55036828, 9.63558866])
-
-    array3 = np.array([1.29230881, 10.04953025, 2.3225288, 11.41011835, 1.55839111, 1.20803691,
-                       2.98409638, 10.36286252, 1.9893777, 5.91160813])
-
-    array4 = np.array([1.31275648, 12.49244057, 1.2915126, 8.13393705, 1.373989, 10.15408052,
-                       1.57791889, 4.22384385, 2.18566904, 3.9706235])
-
-    array5 = np.array([3.86327776, 1.39613987, 1.75567472, 3.45147908, 2.18981997, 8.01820005,
-                       2.33965478, 10.66301395, 2.74581319, 7.57300941])
-
-    print(euclidean_distance(array1, array2))
-    # print(euclidean_distance(array1, array3))
-    # print(euclidean_distance(array1, array4))
-    # print(euclidean_distance(array3, array4))
-    # print(euclidean_distance(array2, array4))
+    array = np.array([2.3, 4.5])
+    print(np.multiply(array, (0.03 / 3.1)))
 
 
 if __name__ == '__main__':

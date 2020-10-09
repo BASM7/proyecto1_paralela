@@ -2,27 +2,30 @@ import numpy as np
 
 
 class Worm:
-    def __init__(self, new_luminescence, new_position, new_radius):
-        self.luminescence = new_luminescence
+    def __init__(self, new_luciferin, new_position, new_radius):
+        self.luciferin = new_luciferin
         self.radius = new_radius
-        self.fitness = 0
-        self.internal_distance = 0
-        self.neighbors_worms = None
+        self.fitness = 0.0
+        self.internal_distance = 0.0
+        self.neighbors_worms = []
         self.covered_data = None
         self.position = new_position
 
-    def add_neighbor(self, new_neighbor):
-        self.neighbors_worms = np.append(self.neighbors_worms, new_neighbor)
-        if new_neighbor.covered_data is not None:
-            for data in new_neighbor.covered_data:
-                self.covered_data = np.append(self.covered_data, data)
+    def get_brightest_neighbor(self):
+        brightest_neighbor = None
+        for worm in self.neighbors_worms:
+            if brightest_neighbor is None or brightest_neighbor.luciferin < worm.luciferin:
+                brightest_neighbor = worm
+        return brightest_neighbor
+
+    def sum_luciferin(self):
+        sum_total = 0
+        for worm in self.neighbors_worms:
+            sum_total += worm.luciferin
+        return sum_total
 
     def __len__(self):
         return len(self.covered_data) if self.covered_data is not None else 0
-
-    # Deprecated method. TODO remove.
-    def __getitem__(self, index):
-        return self.position
 
     def __str__(self):
         return str(self.__class__) + '\n' + '\n'.join(

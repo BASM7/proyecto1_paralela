@@ -11,14 +11,17 @@ import pprint
 from equations import *
 from worm import Worm
 from mpi4py import MPI
+import pdb
 
 pp = pprint.PrettyPrinter(indent=4)
-FILE_DATA = "poker-hand-training-true.data"
-
-
+# FILE_DATA = "poker-hand-training-true.data"
 # FILE_DATA = "test.data"
 # FILE_DATA = "mini_test.data"
-# FILE_DATA = "tiny_mini_test.data"
+FILE_DATA = "tiny_mini_test.data"
+
+
+LEN = 1
+FIT = 2
 
 
 def get_command_line_values(argv):
@@ -73,6 +76,19 @@ def build_kdimentional_tree(list_data, depth=0):
     }
 
 
+def build_kdimentional_tree_of_swarm(swarm, depth=0):
+    nodes = len(swarm)
+    if nodes <= 0:
+        return None
+    splitting_axis = depth % 10
+    sorted_points = sorted(swarm, key=lambda worm: worm.position[splitting_axis])
+    return {
+        'node': sorted_points[nodes // 2],
+        'left': build_kdimentional_tree_of_swarm(sorted_points[:nodes // 2], depth + 1),
+        'right': build_kdimentional_tree_of_swarm(sorted_points[nodes // 2 + 1:], depth + 1)
+    }
+
+
 def closer_distance(pivot, p1, p2):
     if p1 is None:
         return p2
@@ -86,24 +102,24 @@ def closer_distance(pivot, p1, p2):
     return p1 if distance1 < distance2 else p2
 
 
-def kdimentional_tree_closest_point(root, data_point, depth=0):
-    if root is None:
-        return None
-    spliting_axis = depth % 10
-    if data_point[spliting_axis] < root['node'][spliting_axis]:
-        next_subtree = root['left']
-        opposite_subtree = root['right']
-    else:
-        next_subtree = root['right']
-        opposite_subtree = root['left']
-    best_result = closer_distance(data_point,
-                                  kdimentional_tree_closest_point(next_subtree, data_point, depth + 1),
-                                  root['node'])
-    if euclidean_distance(data_point, best_result) > abs(data_point[spliting_axis] - root['node'][spliting_axis]):
-        best_result = closer_distance(data_point,
-                                      kdimentional_tree_closest_point(opposite_subtree, data_point, depth + 1),
-                                      best_result)
-    return best_result
+# def kdimentional_tree_closest_point(root, data_point, depth=0):
+#     if root is None:
+#         return None
+#     spliting_axis = depth % 10
+#     if data_point[spliting_axis] < root['node'][spliting_axis]:
+#         next_subtree = root['left']
+#         opposite_subtree = root['right']
+#     else:
+#         next_subtree = root['right']
+#         opposite_subtree = root['left']
+#     best_result = closer_distance(data_point,
+#                                   kdimentional_tree_closest_point(next_subtree, data_point, depth + 1),
+#                                   root['node'])
+#     if euclidean_distance(data_point, best_result) > abs(data_point[spliting_axis] - root['node'][spliting_axis]):
+#         best_result = closer_distance(data_point,
+#                                       kdimentional_tree_closest_point(opposite_subtree, data_point, depth + 1),
+#                                       best_result)
+#     return best_result
 
 
 def create_swarm(list_data, starting_luminicesce, radius):
@@ -117,11 +133,13 @@ def create_swarm(list_data, starting_luminicesce, radius):
     return swarm
 
 
-def get_starting_covered_data(root, data_point, radius, depth=0, list_neighbors=None):
+def get_neighborhood(root, worm, depth=0, list_neighbors=None):
     if list_neighbors is None:
         list_neighbors = []
     if root is not None:
-        if euclidean_distance(root['node'], data_point) <= radius:
+        root['node']: Worm
+        distance = euclidean_distance(root['node'].position, worm.position)
+        if (distance < worm.radius) and (root['node'].luciferin > worm.luciferin) and root['node'] != worm:
             list_neighbors.append(root['node'])
 
         left_tree = root['left']
@@ -129,45 +147,135 @@ def get_starting_covered_data(root, data_point, radius, depth=0, list_neighbors=
 
         splitting_axis = depth % 10
 
-        if data_point[splitting_axis] < root['node'][splitting_axis]:
-            get_starting_covered_data(left_tree, data_point, radius, depth + 1, list_neighbors)
+        if worm.position[splitting_axis] < root['node'].position[splitting_axis]:
+            get_neighborhood(left_tree, worm, depth + 1, list_neighbors)
             opposite_subtree = right_tree
         else:
-            get_starting_covered_data(right_tree, data_point, radius, depth + 1, list_neighbors)
+            get_neighborhood(right_tree, worm, depth + 1, list_neighbors)
             opposite_subtree = left_tree
         if opposite_subtree is not None:
-            if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= radius:
-                get_starting_covered_data(opposite_subtree, data_point, radius, depth + 1, list_neighbors)
-
+            child_worm = opposite_subtree['node']
+            child_worm: Worm
+            if abs(child_worm.position[splitting_axis] - worm.position[splitting_axis]) <= worm.radius:
+                get_neighborhood(opposite_subtree, worm, depth + 1, list_neighbors)
     return list_neighbors
 
 
-def get_starting_centroid_list(swarm):
-    starting_centroid_list = []
-    for index, worm in enumerate(swarm):
-        if not starting_centroid_list:
-            starting_centroid_list.append(index)
+def get_covered_data(root, data_point, radius, depth=0, list_data=None):
+    if list_data is None:
+        list_data = []
+    if root is not None:
+        if euclidean_distance(root['node'], data_point) < radius:
+            list_data.append(root['node'])
+
+        left_tree = root['left']
+        right_tree = root['right']
+
+        splitting_axis = depth % 10
+
+        if data_point[splitting_axis] < root['node'][splitting_axis]:
+            get_covered_data(left_tree, data_point, radius, depth + 1, list_data)
+            opposite_subtree = right_tree
+        else:
+            get_covered_data(right_tree, data_point, radius, depth + 1, list_data)
+            opposite_subtree = left_tree
+        if opposite_subtree is not None:
+            if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= radius:
+                get_covered_data(opposite_subtree, data_point, radius, depth + 1, list_data)
+    return list_data
+
+
+def get_centroid_list(swarm):
+    centroid_list = []
+    for worm in swarm:
+        if not centroid_list:
+            centroid_list.append(worm)
         else:
             valid = True
-            for temp_index in starting_centroid_list:
-                distance = euclidean_distance(swarm[temp_index].position, worm.position)
+            for temp_worm in centroid_list:
+                distance = euclidean_distance(temp_worm.position, worm.position)
                 if distance < worm.radius:
                     valid = False
                     break
             if valid:
-                starting_centroid_list.append(index)
-    return starting_centroid_list
+                centroid_list.append(worm)
+    return centroid_list
 
 
 def start_covered_data(tree, worm):
-    return get_starting_covered_data(tree, worm.position, worm.radius)
+    return get_covered_data(tree, worm.position, worm.radius)
 
 
 def clean_swarm(swarm):
-    for index, worm in enumerate(swarm):
-        if worm.covered_data is None:
-            del swarm[index]
-    return swarm
+    new_swarm = []
+    for worm in swarm:
+        if worm.covered_data is not None and len(worm.covered_data) > 0:
+            new_swarm.append(worm)
+    return new_swarm
+
+
+def sort_swarm(swarm, criterion):
+    if criterion == LEN:
+        return sorted(swarm, key=lambda x: len(x), reverse=True)
+    else:
+        return sorted(swarm, key=lambda x: x.fitness, reverse=True)
+
+
+def get_tree_size(root):
+    size = 0
+    if root is not None:
+        size += 1
+    else:
+        return size
+
+    size += get_tree_size(root['left'])
+    size += get_tree_size(root['right'])
+
+    return size
+
+
+def get_min_index(rank, collection, size):
+    return int((rank * len(collection) / size))
+
+
+def get_max_index(rank, collection, size):
+    return int((rank + 1) * len(collection) / size)
+
+
+def set_covered_data(swarm, tree):
+    for worm in swarm:
+        worm.covered_data = np.array(start_covered_data(tree, worm))
+        worm.internal_distance = calculate_intra_distance(worm)
+
+
+def set_worm_neighborhood(swarm, tree_swarm):
+    for worm in swarm:
+        worm.neighbors_worms = get_neighborhood(tree_swarm, worm)
+
+
+def update_luciferin_fitness(swarm, sum_squared_errors,
+                             max_internal_dist, cant_data, lucifering_dec, lucifering_inc, inter_dist):
+    for worm in swarm:
+        new_fitness = calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist)
+        worm.fitness = new_fitness
+        new_luciferin = calculate_luciferin(worm, lucifering_dec, lucifering_inc)
+        worm.luciferin = new_luciferin
+
+
+def update_positions(swarm, worm_step):
+    for worm in swarm:
+        worm.position = calculate_new_position(worm, worm.get_brightest_neighbor(), worm_step)
+
+
+def print_list(collection):
+    for item in collection:
+        print(item)
+
+
+def record_time(total_time):
+    time_file = open("time.txt", "w")
+    time_file.write(str(total_time) + ' segundos')
+    time_file.close()
 
 
 def main(argv):
@@ -181,12 +289,12 @@ def main(argv):
 
     lucifering_dec = 0.0
     lucifering_inc = 0.0
-    worm_movement_distance = 0.0
-    radius = 0.0
-    starting_luciferin = 0.0
+    worm_step = 0.0
+    # radius = 0.0
+    # starting_luciferin = 0.0
 
     if rank == 0:
-        lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin = \
+        lucifering_dec, lucifering_inc, worm_step, radius, starting_luciferin = \
             get_command_line_values(argv)
         list_data = load_data(FILE_DATA)
         tree = build_kdimentional_tree(list_data)
@@ -196,59 +304,103 @@ def main(argv):
 
     t_start = MPI.Wtime()
 
-    list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin = \
-        comm.bcast((
-            list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_movement_distance, radius, starting_luciferin),
-            0)
-
-    min_index = int((rank * len(swarm) / size))
-    max_index = int((rank + 1) * len(swarm) / size)
-
-    # Etapa de inicializacion
-    for index in range(min_index, max_index):
-        worm = swarm[index]
-        worm.covered_data = start_covered_data(tree, worm)
-        worm.internal_distance = calculate_intra_distance(worm)
-
-    list_centroid_candidates = []
-    # ordenar el enjambre.
-    sum_squared_errors = 0
-    if rank == 0:
-        swarm = clean_swarm(swarm)
-        swarm = sorted(swarm, key=lambda x: len(x), reverse=True)
-        list_centroid_candidates = get_starting_centroid_list(swarm)
-        sum_squared_errors = calculate_sum_squared_errors(swarm, list_centroid_candidates)
-
-    comm.Barrier()
-    swarm, list_centroid_candidates, sum_squared_errors = \
-        comm.bcast((swarm, list_centroid_candidates, sum_squared_errors), 0)
-
-    # iteration = 0
-    # while len(list_centroid_candidates) > 10 and iteration < 1000:
-
-    max_internal_dist = 0
-    if rank == 0:
-        print('cantidad inicial de centroides: ', len(list_centroid_candidates))
-        max_internal_dist = calculate_max_internal_distance(swarm, list_centroid_candidates)
-
-    comm.Barrier()
-    max_internal_dist = comm.bcast(max_internal_dist, root=0)
-
-    for index in range(max_index, max_index):
-        worm = swarm[index]
-        worm.fitness = calculate_fitness(worm, sum_squared_errors, max_internal_dist, len(list_data))
-
-    # comm.Barrier()
-    # list_centroid_candidates = comm.bcast(list_centroid_candidates, 0)
+    list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step = \
+        comm.bcast((list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step), root=0)
 
     if rank == 0:
-        print('cantidad siguiente de centroides: ', len(list_centroid_candidates))
+        swarm_chunk = [[] for _ in range(size)]
+        for i, worm in enumerate(swarm):
+            swarm_chunk[i % size].append(worm)
+    else:
+        swarm_chunk = None
+
+    # Etapa de inicializacion.
+
+    swarm = comm.scatter(swarm_chunk, root=0)
+    set_covered_data(swarm, tree)
+    new_swarm = comm.gather(swarm, root=0)
+    if rank == 0:
+        swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+        swarm = sort_swarm(clean_swarm(swarm), LEN)
+        list_centroid_candidates = get_centroid_list(swarm)
+        sse = calculate_sum_squared_errors(list_centroid_candidates)
+
+        # pdb.set_trace()
+        # breakpoint()
+    else:
+        list_centroid_candidates = None
+        sse = None
+        swarm = None
+
+    iteration = 0
+    # len(list_centroid_candidates) > 10 and
+    while iteration < 1:
+
+        if rank == 0:
+            print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
+            max_internal_dist = calculate_max_internal_distance(list_centroid_candidates)
+            inter_dist = calculate_inter_centroid_distance(list_centroid_candidates)
+        else:
+            max_internal_dist = None
+            inter_dist = None
+
+        max_internal_dist, inter_dist, sse = comm.bcast((max_internal_dist, inter_dist, sse), root=0)
+
+        # Romper la lista de gusanos en pezados.
+        if rank == 0:
+            swarm_chunk = [[] for _ in range(size)]
+            for i, worm in enumerate(swarm):
+                swarm_chunk[i % size].append(worm)
+        else:
+            swarm_chunk = None
+
+        swarm = comm.scatter(swarm_chunk, root=0)
+        update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data),
+                                 lucifering_dec, lucifering_inc, inter_dist)
+        new_swarm = comm.gather(swarm, root=0)
+        if rank == 0:
+            swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+            tree_swarm = build_kdimentional_tree_of_swarm(swarm)
+        else:
+            tree_swarm = None
+            swarm = None
+
+        tree_swarm = comm.bcast(tree_swarm, root=0)
+
+        if rank == 0:
+            swarm_chunk = [[] for _ in range(size)]
+            for i, worm in enumerate(swarm):
+                swarm_chunk[i % size].append(worm)
+        else:
+            swarm_chunk = None
+
+        swarm = comm.scatter(swarm_chunk, root=0)
+        set_worm_neighborhood(swarm, tree_swarm)
+        update_positions(swarm, worm_step)
+        set_covered_data(swarm, tree)
+        new_swarm = comm.gather(swarm, root=0)
+
+        if rank == 0:
+            # nuevo ordenamiento con el fitness.
+            swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+            swarm = sort_swarm(clean_swarm(swarm), FIT)
+            list_centroid_candidates = get_centroid_list(swarm)
+            sse = calculate_sum_squared_errors(list_centroid_candidates)
+            iteration += 1
+            print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
+        else:
+            swarm = None
+            list_centroid_candidates = None
+            sse = None
+
+        iteration = comm.bcast(iteration, root=0)
 
     t_final = MPI.Wtime()
-    tw = comm.allreduce(t_final - t_start, op=MPI.MAX)
+    total_time = comm.allreduce(t_final - t_start, op=MPI.MAX)
 
     if rank == 0:
-        pp.pprint(tw)
+        record_time(total_time)
+
     return
 
 
