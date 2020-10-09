@@ -19,7 +19,6 @@ pp = pprint.PrettyPrinter(indent=4)
 # FILE_DATA = "mini_test.data"
 FILE_DATA = "tiny_mini_test.data"
 
-
 LEN = 1
 FIT = 2
 
@@ -156,7 +155,7 @@ def get_neighborhood(root, worm, depth=0, list_neighbors=None):
         if opposite_subtree is not None:
             child_worm = opposite_subtree['node']
             child_worm: Worm
-            if abs(child_worm.position[splitting_axis] - worm.position[splitting_axis]) <= worm.radius:
+            if abs(child_worm.position[splitting_axis] - worm.position[splitting_axis]) < worm.radius:
                 get_neighborhood(opposite_subtree, worm, depth + 1, list_neighbors)
     return list_neighbors
 
@@ -262,9 +261,13 @@ def update_luciferin_fitness(swarm, sum_squared_errors,
         worm.luciferin = new_luciferin
 
 
-def update_positions(swarm, worm_step):
+def update_positions_and_data(swarm, worm_step, tree):
     for worm in swarm:
+        previous_pos = worm.position
         worm.position = calculate_new_position(worm, worm.get_brightest_neighbor(), worm_step)
+        if np.all(previous_pos == worm.position):
+            worm.covered_data = np.array(start_covered_data(tree, worm))
+            worm.internal_distance = calculate_intra_distance(worm)
 
 
 def print_list(collection):
@@ -325,8 +328,8 @@ def main(argv):
         list_centroid_candidates = get_centroid_list(swarm)
         sse = calculate_sum_squared_errors(list_centroid_candidates)
 
+        # print('cantidad inicial de centroides: ', len(list_centroid_candidates))
         # pdb.set_trace()
-        # breakpoint()
     else:
         list_centroid_candidates = None
         sse = None
@@ -334,10 +337,9 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 1:
+    while iteration < 10:
 
         if rank == 0:
-            print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
             max_internal_dist = calculate_max_internal_distance(list_centroid_candidates)
             inter_dist = calculate_inter_centroid_distance(list_centroid_candidates)
         else:
@@ -361,9 +363,14 @@ def main(argv):
         if rank == 0:
             swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
             tree_swarm = build_kdimentional_tree_of_swarm(swarm)
+
+            test_worm = np.random.choice(swarm)
+            print(test_worm)
+
         else:
             tree_swarm = None
             swarm = None
+            test_worm = None
 
         tree_swarm = comm.bcast(tree_swarm, root=0)
 
@@ -376,8 +383,7 @@ def main(argv):
 
         swarm = comm.scatter(swarm_chunk, root=0)
         set_worm_neighborhood(swarm, tree_swarm)
-        update_positions(swarm, worm_step)
-        set_covered_data(swarm, tree)
+        update_positions_and_data(swarm, worm_step, tree)
         new_swarm = comm.gather(swarm, root=0)
 
         if rank == 0:
@@ -387,12 +393,15 @@ def main(argv):
             list_centroid_candidates = get_centroid_list(swarm)
             sse = calculate_sum_squared_errors(list_centroid_candidates)
             iteration += 1
-            print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
+
+            print(test_worm)
+            # print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
         else:
             swarm = None
             list_centroid_candidates = None
             sse = None
 
+        comm.Barrier()
         iteration = comm.bcast(iteration, root=0)
 
     t_final = MPI.Wtime()
