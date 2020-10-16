@@ -270,6 +270,14 @@ def update_positions_and_data(swarm, worm_step, tree):
     return swarm
 
 
+def get_swarm_chunks(swarm, size):
+    swarm_chunk = [[] for _ in range(size)]
+    for i, worm in enumerate(swarm):
+        swarm_chunk[i % size].append(worm)
+    return swarm_chunk
+
+
+# for Debug. TODO: delete.
 def print_list(collection):
     for item in collection:
         print(item)
@@ -292,48 +300,43 @@ def main(argv):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    list_data = []
-    swarm = []
-    tree = {}
-
-    lucifering_dec = 0.0
-    lucifering_inc = 0.0
+    luci_dec = 0.0
+    luci_inc = 0.0
     worm_step = 0.0
-    # radius = 0.0
-    # starting_luciferin = 0.0
 
     t_start = MPI.Wtime()
 
     if rank == 0:
-        # delete the exit file if it exists.
         if os.path.exists('salida.txt'):
             os.remove('salida.txt')
 
-        lucifering_dec, lucifering_inc, worm_step, radius, starting_luciferin = \
-            get_command_line_values(argv)
+        luci_dec, luci_inc, worm_step, radius, starting_luciferin = get_command_line_values(argv)
         list_data = load_data(FILE_DATA)
-        tree = build_kdimentional_tree(list_data)
+        tree_data = build_kdimentional_tree(list_data)
 
         # TODO: paralelizar creacion de enjambre.
         swarm = create_swarm(list_data, starting_luciferin, radius)
+    else:
+        list_data = None
+        swarm = None
+        tree_data = None
 
-    list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step = \
-        comm.bcast((list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step), root=0)
+    list_data, tree_data, swarm = comm.bcast((list_data, tree_data, swarm), root=0)
+    luci_dec, luci_inc, worm_step = comm.bcast((luci_dec, luci_inc, worm_step), root=0)
 
     if rank == 0:
-        swarm_chunk = [[] for _ in range(size)]
-        for i, worm in enumerate(swarm):
-            swarm_chunk[i % size].append(worm)
+        swarm_chunk = get_swarm_chunks(swarm, size)
     else:
         swarm_chunk = None
 
     # Etapa de inicializacion.
 
     swarm = comm.scatter(swarm_chunk, root=0)
-    swarm = set_covered_data(swarm, tree)
-    new_swarm = comm.gather(swarm, root=0)
+    swarm = set_covered_data(swarm, tree_data)
+    local_swarm = comm.gather(swarm, root=0)
+
     if rank == 0:
-        swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+        swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
         swarm = sort_swarm(clean_swarm(swarm), LEN)
         list_centroid_candidates = get_centroid_list(swarm)
         sse = calculate_sum_squared_errors(list_centroid_candidates)
@@ -347,7 +350,7 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 3:
+    while iteration < 2:
 
         comm.Barrier()
         if rank == 0:
@@ -362,23 +365,19 @@ def main(argv):
         # Romper la lista de gusanos en pezados.
         comm.Barrier()
         if rank == 0:
-            # print(swarm[0])
-            swarm_chunk = [[] for _ in range(size)]
-            for i, worm in enumerate(swarm):
-                swarm_chunk[i % size].append(worm)
+            swarm_chunk = get_swarm_chunks(swarm, size)
         else:
             swarm_chunk = None
 
         comm.Barrier()
 
         swarm = comm.scatter(swarm_chunk, root=0)
-        swarm = update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data),
-                                         lucifering_dec, lucifering_inc, inter_dist)
-        new_swarm = comm.gather(swarm, root=0)
+        swarm = update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data), luci_dec, luci_inc, inter_dist)
+        local_swarm = comm.gather(swarm, root=0)
 
         comm.Barrier()
         if rank == 0:
-            swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+            swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
             tree_swarm = build_kdimentional_tree_of_swarm(swarm)
         else:
             tree_swarm = None
@@ -388,9 +387,7 @@ def main(argv):
 
         comm.Barrier()
         if rank == 0:
-            swarm_chunk = [[] for _ in range(size)]
-            for i, worm in enumerate(swarm):
-                swarm_chunk[i % size].append(worm)
+            swarm_chunk = get_swarm_chunks(swarm, size)
         else:
             swarm_chunk = None
 
@@ -398,17 +395,20 @@ def main(argv):
 
         swarm = comm.scatter(swarm_chunk, root=0)
         swarm = set_worm_neighborhood(swarm, tree_swarm)
-        swarm = update_positions_and_data(swarm, worm_step, tree)
-        new_swarm = comm.gather(swarm, root=0)
+        swarm = update_positions_and_data(swarm, worm_step, tree_data)
+        local_swarm = comm.gather(swarm, root=0)
 
         comm.Barrier()
         if rank == 0:
             # nuevo ordenamiento con el fitness.
-            swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
+            swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
             swarm = sort_swarm(clean_swarm(swarm), FIT)
             list_centroid_candidates = get_centroid_list(swarm)
             sse = calculate_sum_squared_errors(list_centroid_candidates)
             iteration += 1
+
+            # if iteration == 2:
+            #     pdb.set_trace()
 
             record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
         else:
@@ -423,9 +423,6 @@ def main(argv):
     total_time = comm.allreduce(t_final - t_start, op=MPI.MAX)
 
     if rank == 0:
-        # print('cant worms: ', len(swarm))
-        # for i, worm in enumerate(swarm):
-        #     print(i, ' -> ', worm.fitness)
         record_time(total_time)
 
     return
@@ -435,4 +432,3 @@ if __name__ == '__main__':
     main(sys.argv[1:])
 
 # mpiexec -n 4 python main.py -r 0.4 -g 0.6 -s 0.03 -i 4.0 -l 5.0
-
