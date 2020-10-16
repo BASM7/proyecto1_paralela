@@ -347,8 +347,9 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 5:
+    while iteration < 2:
 
+        comm.Barrier()
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(list_centroid_candidates)
             inter_dist = calculate_inter_centroid_distance(list_centroid_candidates)
@@ -359,7 +360,7 @@ def main(argv):
         max_internal_dist, inter_dist, sse = comm.bcast((max_internal_dist, inter_dist, sse), root=0)
 
         # Romper la lista de gusanos en pezados.
-        # comm.Barrier()
+        comm.Barrier()
         if rank == 0:
             # print(swarm[0])
             swarm_chunk = [[] for _ in range(size)]
@@ -369,6 +370,7 @@ def main(argv):
             swarm_chunk = None
 
         comm.Barrier()
+
         swarm = comm.scatter(swarm_chunk, root=0)
         swarm = update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data),
                                          lucifering_dec, lucifering_inc, inter_dist)
@@ -393,6 +395,7 @@ def main(argv):
             swarm_chunk = None
 
         comm.Barrier()
+
         swarm = comm.scatter(swarm_chunk, root=0)
         swarm = set_worm_neighborhood(swarm, tree_swarm)
         swarm = update_positions_and_data(swarm, worm_step, tree)
