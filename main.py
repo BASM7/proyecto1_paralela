@@ -13,11 +13,6 @@ from equations import *
 from worm import Worm
 from mpi4py import MPI
 
-# FILE_DATA = "poker-hand-training-true.data"
-FILE_DATA = "test.data"
-# FILE_DATA = "mini_test.data"
-# FILE_DATA = "tiny_mini_test.data"
-
 LEN = 1
 FIT = 2
 
@@ -53,7 +48,7 @@ def get_command_line_values(argv):
 def load_data(filename):
     f = open(filename, "r")
     filas = f.readlines()
-    loaded_data = np.empty(shape=(len(filas), 10))
+    loaded_data = np.empty(shape=(len(filas), 10), dtype=int)
     for i, fila in enumerate(filas):
         tlist = [int(s) for s in fila.__str__().split(',')]
         alist = np.array(tlist[0:-1])
@@ -98,26 +93,6 @@ def closer_distance(pivot, p1, p2):
     distance2 = euclidean_distance(pivot, p2)
 
     return p1 if distance1 < distance2 else p2
-
-
-# def kdimentional_tree_closest_point(root, data_point, depth=0):
-#     if root is None:
-#         return None
-#     spliting_axis = depth % 10
-#     if data_point[spliting_axis] < root['node'][spliting_axis]:
-#         next_subtree = root['left']
-#         opposite_subtree = root['right']
-#     else:
-#         next_subtree = root['right']
-#         opposite_subtree = root['left']
-#     best_result = closer_distance(data_point,
-#                                   kdimentional_tree_closest_point(next_subtree, data_point, depth + 1),
-#                                   root['node'])
-#     if euclidean_distance(data_point, best_result) > abs(data_point[spliting_axis] - root['node'][spliting_axis]):
-#         best_result = closer_distance(data_point,
-#                                       kdimentional_tree_closest_point(opposite_subtree, data_point, depth + 1),
-#                                       best_result)
-#     return best_result
 
 
 def create_swarm(list_data, starting_luminicesce, radius):
@@ -179,23 +154,6 @@ def get_covered_data(root, data_point, radius, depth=0, list_data=None):
             if abs(opposite_subtree['node'][splitting_axis] - data_point[splitting_axis]) <= radius:
                 get_covered_data(opposite_subtree, data_point, radius, depth + 1, list_data)
     return list_data
-
-
-def get_centroid_list(swarm):
-    centroid_list = []
-    for worm in swarm:
-        if not centroid_list:
-            centroid_list.append(worm)
-        else:
-            valid = True
-            for temp_worm in centroid_list:
-                distance = euclidean_distance(temp_worm.position, worm.position)
-                if distance < worm.radius:
-                    valid = False
-                    break
-            if valid:
-                centroid_list.append(worm)
-    return centroid_list
 
 
 def start_covered_data(tree, worm):
@@ -265,9 +223,27 @@ def update_positions_and_data(swarm, worm_step, tree):
         previous_pos = worm.position
         worm.position = calculate_new_position(worm, worm.get_brightest_neighbor(), worm_step)
         if np.all(previous_pos != worm.position):
-            worm.covered_data = np.array(start_covered_data(tree, worm))
+            worm.covered_data = np.array(start_covered_data(tree, worm), dtype=int)
             worm.internal_distance = calculate_intra_distance(worm)
     return swarm
+
+
+def get_centroid_list(swarm, radius):
+    centroid_list = []
+    for index, worm in enumerate(swarm):
+        if not centroid_list:
+            centroid_list.append(index)
+        else:
+            valid = True
+            for temp_index in centroid_list:
+                temp_worm = swarm[temp_index]
+                distance = euclidean_distance(temp_worm.position, worm.position)
+                if distance < radius:
+                    valid = False
+                    break
+            if valid:
+                centroid_list.append(index)
+    return np.array(centroid_list, dtype=int)
 
 
 def get_swarm_chunks(swarm, size):
@@ -296,6 +272,11 @@ def record_time(total_time):
 
 
 def main(argv):
+    FILE_DATA = "poker-hand-training-true.data"
+    # FILE_DATA = "test.data"
+    # FILE_DATA = "mini_test.data"
+    # FILE_DATA = "tiny_mini_test.data"
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -303,6 +284,7 @@ def main(argv):
     luci_dec = 0.0
     luci_inc = 0.0
     worm_step = 0.0
+    radius = 0.0
 
     t_start = MPI.Wtime()
 
@@ -311,26 +293,48 @@ def main(argv):
             os.remove('salida.txt')
 
         luci_dec, luci_inc, worm_step, radius, starting_luciferin = get_command_line_values(argv)
+
+        print("1) poker-hand-training-true.data")
+        print("2) test.data")
+        print("3) mini_test.data")
+        print("4) tiny_mini_test.data")
+        op = input("Data? ")
+
+        if op == "1":
+            FILE_DATA = "poker-hand-training-true.data"
+        elif op == "2":
+            FILE_DATA = "test.data"
+        elif op == "3":
+            FILE_DATA = "mini_test.data"
+        elif op == "4":
+            FILE_DATA = "tiny_mini_test.data"
+
         list_data = load_data(FILE_DATA)
         tree_data = build_kdimentional_tree(list_data)
 
+        # pdb.set_trace()
+
         # TODO: paralelizar creacion de enjambre.
         swarm = create_swarm(list_data, starting_luciferin, radius)
+
+        # pdb.set_trace()
     else:
         list_data = None
         swarm = None
         tree_data = None
 
-    list_data, tree_data, swarm = comm.bcast((list_data, tree_data, swarm), root=0)
-    luci_dec, luci_inc, worm_step = comm.bcast((luci_dec, luci_inc, worm_step), root=0)
+    list_data, tree_data, swarm, luci_dec, luci_inc, worm_step, radius = \
+        comm.bcast((list_data, tree_data, swarm, luci_dec, luci_inc, worm_step, radius), root=0)
 
     if rank == 0:
+        # pdb.set_trace()
         swarm_chunk = get_swarm_chunks(swarm, size)
     else:
         swarm_chunk = None
 
     # Etapa de inicializacion.
 
+    comm.Barrier()
     swarm = comm.scatter(swarm_chunk, root=0)
     swarm = set_covered_data(swarm, tree_data)
     local_swarm = comm.gather(swarm, root=0)
@@ -338,8 +342,8 @@ def main(argv):
     if rank == 0:
         swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
         swarm = sort_swarm(clean_swarm(swarm), LEN)
-        list_centroid_candidates = get_centroid_list(swarm)
-        sse = calculate_sum_squared_errors(list_centroid_candidates)
+        list_centroid_candidates = get_centroid_list(swarm, radius)
+        sse = calculate_sum_squared_errors(swarm, list_centroid_candidates)
 
         record_output('cantidad inicial de centroides: ' + str(len(list_centroid_candidates)))
         # pdb.set_trace()
@@ -354,8 +358,10 @@ def main(argv):
 
         comm.Barrier()
         if rank == 0:
-            max_internal_dist = calculate_max_internal_distance(list_centroid_candidates)
-            inter_dist = calculate_inter_centroid_distance(list_centroid_candidates)
+            max_internal_dist = calculate_max_internal_distance(swarm, list_centroid_candidates)
+            inter_dist = calculate_inter_centroid_distance(swarm, list_centroid_candidates)
+
+            # pdb.set_trace()
         else:
             max_internal_dist = None
             inter_dist = None
@@ -379,6 +385,7 @@ def main(argv):
         if rank == 0:
             swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
             tree_swarm = build_kdimentional_tree_of_swarm(swarm)
+            # pdb.set_trace()
         else:
             tree_swarm = None
             swarm = None
@@ -403,13 +410,10 @@ def main(argv):
             # nuevo ordenamiento con el fitness.
             swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
             swarm = sort_swarm(clean_swarm(swarm), FIT)
-            list_centroid_candidates = get_centroid_list(swarm)
-            sse = calculate_sum_squared_errors(list_centroid_candidates)
+            list_centroid_candidates = get_centroid_list(swarm, radius)
+            sse = calculate_sum_squared_errors(swarm, list_centroid_candidates)
             iteration += 1
-
-            # if iteration == 2:
-            #     pdb.set_trace()
-
+            # pdb.set_trace()
             record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
         else:
             swarm = None

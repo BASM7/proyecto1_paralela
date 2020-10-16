@@ -12,9 +12,10 @@ def calculate_intra_distance(worm):
     return sum_total
 
 
-def calculate_sum_squared_errors(centroids_list):
+def calculate_sum_squared_errors(swarm, centroids_list):
     sum_total = 0
-    for worm in centroids_list:
+    for index in centroids_list:
+        worm = swarm[index]
         worm_pos = worm.position
         sum_temp = 0
         if worm.covered_data is not None:
@@ -24,17 +25,20 @@ def calculate_sum_squared_errors(centroids_list):
     return sum_total
 
 
-def calculate_inter_centroid_distance(centroid_list):
+def calculate_inter_centroid_distance(swarm, centroid_list):
     sum_total = 0
-    for centroid in centroid_list:
-        for second_centroid in centroid_list:
-            sum_total += (euclidean_distance(centroid.position, second_centroid.position) ** 2)
+    for index in centroid_list:
+        worm = swarm[index]
+        for s_index in centroid_list:
+            second_worm = swarm[s_index]
+            sum_total += (euclidean_distance(worm.position, second_worm.position) ** 2)
     return sum_total
 
 
-def calculate_max_internal_distance(centroid_list):
+def calculate_max_internal_distance(swarm, centroid_list):
     max_internal_dist = 0
-    for worm in centroid_list:
+    for index in centroid_list:
+        worm = swarm[index]
         if worm.internal_distance > max_internal_dist:
             max_internal_dist = worm.internal_distance
     return max_internal_dist
@@ -67,9 +71,6 @@ def calculate_new_position(worm, brightest_neighbor, worm_step):
     return new_position
 
 
-# def calculate_new_position(worm, brightest_neighbor, worm_step):
-#     brightest_neighbor: Worm
-#     new_position = worm.position
 def main():
     array = np.array([2.3, 4.5])
     print(np.multiply(array, (0.03 / 3.1)))

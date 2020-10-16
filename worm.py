@@ -2,9 +2,12 @@ import numpy as np
 
 
 class Worm:
+    __slots__ = ["luciferin", "radius", "fitness", "internal_distance",
+                 "neighbors_worms", "covered_data", "position"]
+
     def __init__(self, new_luciferin, new_position, new_radius):
         self.luciferin = new_luciferin
-        self.radius = new_radius
+        self.radius = new_radius        # TODO: remove radius atribute from worm.
         self.fitness = 0.0
         self.internal_distance = 0.0
         self.neighbors_worms = []
@@ -29,10 +32,6 @@ class Worm:
 
     def __len__(self):
         return len(self.covered_data) if self.covered_data is not None else 0
-
-    def __str__(self):
-        return str(self.__class__) + '\n' + '\n'.join(
-            ('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
 
 
 def main():
