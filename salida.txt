@@ -1,0 +1,5 @@
+cantidad inicial de centroides: 652
+i: 1 cantidad de centroides: 694
+i: 2 cantidad de centroides: 682
+i: 3 cantidad de centroides: 667
+i: 4 cantidad de centroides: 669

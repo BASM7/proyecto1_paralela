@@ -11,6 +11,9 @@ class Worm:
         self.covered_data = None
         self.position = new_position
 
+    def set_fitness(self, new_fitness):
+        self.fitness = new_fitness
+
     def get_brightest_neighbor(self):
         brightest_neighbor = None
         for worm in self.neighbors_worms:

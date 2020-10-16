@@ -1,6 +1,4 @@
 import numpy as np
-from worm import Worm
-from decimal import *
 
 
 def euclidean_distance(vector1, vector2):
@@ -45,8 +43,8 @@ def calculate_max_internal_distance(centroid_list):
 def calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist):
     nominator = inter_dist * (1 / cant_data) * len(worm)
     denominator = sum_squared_errors * (worm.internal_distance / max_internal_dist)
-
-    return nominator / denominator
+    new_fitness = nominator / denominator
+    return new_fitness
 
 
 def calculate_luciferin(worm, constant_decay, enhancement_fraction):
@@ -58,7 +56,6 @@ def calculate_probability(worm1, worm2):
 
 
 def calculate_new_position(worm, brightest_neighbor, worm_step):
-    brightest_neighbor: Worm
     new_position = worm.position
     if brightest_neighbor is not None:
         distance = euclidean_distance(worm.position, brightest_neighbor.position)

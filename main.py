@@ -7,17 +7,16 @@ Luis Alfonso Jiménez Aguilar B93986
 
 import sys
 import getopt
-import pprint
+import os
+import pdb
 from equations import *
 from worm import Worm
 from mpi4py import MPI
-import pdb
 
-pp = pprint.PrettyPrinter(indent=4)
 # FILE_DATA = "poker-hand-training-true.data"
-# FILE_DATA = "test.data"
+FILE_DATA = "test.data"
 # FILE_DATA = "mini_test.data"
-FILE_DATA = "tiny_mini_test.data"
+# FILE_DATA = "tiny_mini_test.data"
 
 LEN = 1
 FIT = 2
@@ -132,14 +131,13 @@ def create_swarm(list_data, starting_luminicesce, radius):
     return swarm
 
 
-def get_neighborhood(root, worm, depth=0, list_neighbors=None):
-    if list_neighbors is None:
-        list_neighbors = []
+def get_neighborhood(root, worm, depth=0, neighbors_worms=None):
+    if neighbors_worms is None:
+        neighbors_worms = []
     if root is not None:
-        root['node']: Worm
         distance = euclidean_distance(root['node'].position, worm.position)
-        if (distance < worm.radius) and (root['node'].luciferin > worm.luciferin) and root['node'] != worm:
-            list_neighbors.append(root['node'])
+        if (distance < worm.radius) and (root['node'].luciferin > worm.luciferin):
+            neighbors_worms.append(root['node'])
 
         left_tree = root['left']
         right_tree = root['right']
@@ -147,17 +145,16 @@ def get_neighborhood(root, worm, depth=0, list_neighbors=None):
         splitting_axis = depth % 10
 
         if worm.position[splitting_axis] < root['node'].position[splitting_axis]:
-            get_neighborhood(left_tree, worm, depth + 1, list_neighbors)
+            get_neighborhood(left_tree, worm, depth + 1, neighbors_worms)
             opposite_subtree = right_tree
         else:
-            get_neighborhood(right_tree, worm, depth + 1, list_neighbors)
+            get_neighborhood(right_tree, worm, depth + 1, neighbors_worms)
             opposite_subtree = left_tree
         if opposite_subtree is not None:
             child_worm = opposite_subtree['node']
-            child_worm: Worm
-            if abs(child_worm.position[splitting_axis] - worm.position[splitting_axis]) < worm.radius:
-                get_neighborhood(opposite_subtree, worm, depth + 1, list_neighbors)
-    return list_neighbors
+            if abs(child_worm.position[splitting_axis] - worm.position[splitting_axis]) <= worm.radius:
+                get_neighborhood(opposite_subtree, worm, depth + 1, neighbors_worms)
+    return neighbors_worms
 
 
 def get_covered_data(root, data_point, radius, depth=0, list_data=None):
@@ -245,34 +242,43 @@ def set_covered_data(swarm, tree):
     for worm in swarm:
         worm.covered_data = np.array(start_covered_data(tree, worm))
         worm.internal_distance = calculate_intra_distance(worm)
+    return swarm
 
 
 def set_worm_neighborhood(swarm, tree_swarm):
     for worm in swarm:
         worm.neighbors_worms = get_neighborhood(tree_swarm, worm)
+    return swarm
 
 
 def update_luciferin_fitness(swarm, sum_squared_errors,
                              max_internal_dist, cant_data, lucifering_dec, lucifering_inc, inter_dist):
     for worm in swarm:
-        new_fitness = calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist)
-        worm.fitness = new_fitness
+        worm.fitness = calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist)
         new_luciferin = calculate_luciferin(worm, lucifering_dec, lucifering_inc)
         worm.luciferin = new_luciferin
+    return swarm
 
 
 def update_positions_and_data(swarm, worm_step, tree):
     for worm in swarm:
         previous_pos = worm.position
         worm.position = calculate_new_position(worm, worm.get_brightest_neighbor(), worm_step)
-        if np.all(previous_pos == worm.position):
+        if np.all(previous_pos != worm.position):
             worm.covered_data = np.array(start_covered_data(tree, worm))
             worm.internal_distance = calculate_intra_distance(worm)
+    return swarm
 
 
 def print_list(collection):
     for item in collection:
         print(item)
+
+
+def record_output(new_line):
+    output_file = open("salida.txt", "a")
+    output_file.write(new_line + '\n')
+    output_file.close()
 
 
 def record_time(total_time):
@@ -296,7 +302,13 @@ def main(argv):
     # radius = 0.0
     # starting_luciferin = 0.0
 
+    t_start = MPI.Wtime()
+
     if rank == 0:
+        # delete the exit file if it exists.
+        if os.path.exists('salida.txt'):
+            os.remove('salida.txt')
+
         lucifering_dec, lucifering_inc, worm_step, radius, starting_luciferin = \
             get_command_line_values(argv)
         list_data = load_data(FILE_DATA)
@@ -304,8 +316,6 @@ def main(argv):
 
         # TODO: paralelizar creacion de enjambre.
         swarm = create_swarm(list_data, starting_luciferin, radius)
-
-    t_start = MPI.Wtime()
 
     list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step = \
         comm.bcast((list_data, tree, swarm, lucifering_dec, lucifering_inc, worm_step), root=0)
@@ -320,7 +330,7 @@ def main(argv):
     # Etapa de inicializacion.
 
     swarm = comm.scatter(swarm_chunk, root=0)
-    set_covered_data(swarm, tree)
+    swarm = set_covered_data(swarm, tree)
     new_swarm = comm.gather(swarm, root=0)
     if rank == 0:
         swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
@@ -328,7 +338,7 @@ def main(argv):
         list_centroid_candidates = get_centroid_list(swarm)
         sse = calculate_sum_squared_errors(list_centroid_candidates)
 
-        # print('cantidad inicial de centroides: ', len(list_centroid_candidates))
+        record_output('cantidad inicial de centroides: ' + str(len(list_centroid_candidates)))
         # pdb.set_trace()
     else:
         list_centroid_candidates = None
@@ -337,7 +347,7 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 10:
+    while iteration < 5:
 
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(list_centroid_candidates)
@@ -349,31 +359,32 @@ def main(argv):
         max_internal_dist, inter_dist, sse = comm.bcast((max_internal_dist, inter_dist, sse), root=0)
 
         # Romper la lista de gusanos en pezados.
+        # comm.Barrier()
         if rank == 0:
+            # print(swarm[0])
             swarm_chunk = [[] for _ in range(size)]
             for i, worm in enumerate(swarm):
                 swarm_chunk[i % size].append(worm)
         else:
             swarm_chunk = None
 
+        comm.Barrier()
         swarm = comm.scatter(swarm_chunk, root=0)
-        update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data),
-                                 lucifering_dec, lucifering_inc, inter_dist)
+        swarm = update_luciferin_fitness(swarm, sse, max_internal_dist, len(list_data),
+                                         lucifering_dec, lucifering_inc, inter_dist)
         new_swarm = comm.gather(swarm, root=0)
+
+        comm.Barrier()
         if rank == 0:
             swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
             tree_swarm = build_kdimentional_tree_of_swarm(swarm)
-
-            test_worm = np.random.choice(swarm)
-            print(test_worm)
-
         else:
             tree_swarm = None
             swarm = None
-            test_worm = None
 
         tree_swarm = comm.bcast(tree_swarm, root=0)
 
+        comm.Barrier()
         if rank == 0:
             swarm_chunk = [[] for _ in range(size)]
             for i, worm in enumerate(swarm):
@@ -381,11 +392,13 @@ def main(argv):
         else:
             swarm_chunk = None
 
+        comm.Barrier()
         swarm = comm.scatter(swarm_chunk, root=0)
-        set_worm_neighborhood(swarm, tree_swarm)
-        update_positions_and_data(swarm, worm_step, tree)
+        swarm = set_worm_neighborhood(swarm, tree_swarm)
+        swarm = update_positions_and_data(swarm, worm_step, tree)
         new_swarm = comm.gather(swarm, root=0)
 
+        comm.Barrier()
         if rank == 0:
             # nuevo ordenamiento con el fitness.
             swarm = [worm for swarm_chunk in new_swarm for worm in swarm_chunk]
@@ -394,8 +407,7 @@ def main(argv):
             sse = calculate_sum_squared_errors(list_centroid_candidates)
             iteration += 1
 
-            print(test_worm)
-            # print('i: ', iteration, ' cantidad de centroides: ', len(list_centroid_candidates))
+            record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
         else:
             swarm = None
             list_centroid_candidates = None
@@ -408,6 +420,9 @@ def main(argv):
     total_time = comm.allreduce(t_final - t_start, op=MPI.MAX)
 
     if rank == 0:
+        # print('cant worms: ', len(swarm))
+        # for i, worm in enumerate(swarm):
+        #     print(i, ' -> ', worm.fitness)
         record_time(total_time)
 
     return
@@ -417,3 +432,4 @@ if __name__ == '__main__':
     main(sys.argv[1:])
 
 # mpiexec -n 4 python main.py -r 0.4 -g 0.6 -s 0.03 -i 4.0 -l 5.0
+
