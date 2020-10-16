@@ -347,7 +347,7 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 2:
+    while iteration < 3:
 
         comm.Barrier()
         if rank == 0:
@@ -416,7 +416,7 @@ def main(argv):
             list_centroid_candidates = None
             sse = None
 
-        comm.Barrier()
+        # comm.Barrier()
         iteration = comm.bcast(iteration, root=0)
 
     t_final = MPI.Wtime()
