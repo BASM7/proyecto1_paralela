@@ -2,27 +2,16 @@ import numpy as np
 
 
 class Worm:
-    __slots__ = ["luciferin", "radius", "fitness", "internal_distance",
-                 "neighbors_worms", "covered_data", "position"]
+    __slots__ = ['luciferin', 'radius', 'fitness', 'internal_distance',
+                 'neighbors_worms', 'covered_data', 'position']
 
-    def __init__(self, new_luciferin, new_position, new_radius):
+    def __init__(self, new_luciferin, new_position):
         self.luciferin = new_luciferin
-        self.radius = new_radius        # TODO: remove radius atribute from worm.
         self.fitness = 0.0
         self.internal_distance = 0.0
-        self.neighbors_worms = []
+        self.neighbors_worms = None
         self.covered_data = None
         self.position = new_position
-
-    def set_fitness(self, new_fitness):
-        self.fitness = new_fitness
-
-    def get_brightest_neighbor(self):
-        brightest_neighbor = None
-        for worm in self.neighbors_worms:
-            if brightest_neighbor is None or brightest_neighbor.luciferin < worm.luciferin:
-                brightest_neighbor = worm
-        return brightest_neighbor
 
     def sum_luciferin(self):
         sum_total = 0
@@ -35,9 +24,7 @@ class Worm:
 
 
 def main():
-    x = np.zeros(10)
-    new_worm = Worm(45, x, 4)
-    print(new_worm)
+    pass
 
 
 if __name__ == '__main__':

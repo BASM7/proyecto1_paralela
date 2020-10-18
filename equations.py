@@ -5,10 +5,10 @@ def euclidean_distance(vector1, vector2):
     return np.linalg.norm(vector1 - vector2)
 
 
-def calculate_intra_distance(worm):
+def calculate_intra_distance(worm, list_data):
     sum_total = 0
-    if worm.covered_data is not None and len(worm.covered_data) > 0:
-        sum_total = sum([euclidean_distance(data_point, worm.position) for data_point in worm.covered_data])
+    if len(worm) > 0:
+        sum_total = sum([euclidean_distance(list_data[index], worm.position) for index in worm.covered_data])
     return sum_total
 
 
@@ -44,9 +44,9 @@ def calculate_max_internal_distance(swarm, centroid_list):
     return max_internal_dist
 
 
-def calculate_fitness(worm, sum_squared_errors, max_internal_dist, cant_data, inter_dist):
-    nominator = inter_dist * (1 / cant_data) * len(worm)
-    denominator = sum_squared_errors * (worm.internal_distance / max_internal_dist)
+def calculate_fitness(cant_data_cov, int_dist, sse, max_internal_dist, cant_data, inter_dist):
+    nominator = inter_dist * (1 / cant_data) * cant_data_cov
+    denominator = sse * (int_dist / max_internal_dist)
     new_fitness = nominator / denominator
     return new_fitness
 
@@ -55,19 +55,18 @@ def calculate_luciferin(worm, constant_decay, enhancement_fraction):
     return (1 - constant_decay) * worm.luciferin + enhancement_fraction * worm.fitness
 
 
-def calculate_probability(worm1, worm2):
-    pass
+# def calculate_probability(worm1, worm2):
+#     pass
 
 
-def calculate_new_position(worm, brightest_neighbor, worm_step):
-    new_position = worm.position
-    if brightest_neighbor is not None:
-        distance = euclidean_distance(worm.position, brightest_neighbor.position)
-        if distance != 0:
-            difference = np.subtract(brightest_neighbor.position, worm.position)
-            fraction = worm_step / distance
-            summand = np.multiply(difference, fraction)
-            new_position = np.add(worm.position, summand)
+def calculate_new_position(pos1, pos2, worm_step):
+    new_position = pos1
+    distance = euclidean_distance(pos1, pos2)
+    if distance > 0:
+        difference = np.subtract(pos2, pos1)
+        fraction = worm_step / distance
+        summand = np.multiply(difference, fraction)
+        new_position = np.add(pos1, summand)
     return new_position
 
 
