@@ -182,8 +182,8 @@ def record_time(total_time):
 
 
 def main(argv):
-    # FILE_DATA = "poker-hand-training-true.data"
-    FILE_DATA = "test.data"
+    FILE_DATA = "poker-hand-training-true.data"
+    # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
     # FILE_DATA = "tiny_mini_test.data"
 
