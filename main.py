@@ -170,14 +170,16 @@ def record_time(total_time):
 
 
 def main(argv):
-    # FILE_DATA = "poker-hand-training-true.data"
+    FILE_DATA = "poker-hand-training-true.data"
     # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
-    FILE_DATA = "tiny_mini_test.data"
+    # FILE_DATA = "tiny_mini_test.data"
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
+    iteration = 0
 
     starting_luciferin = 0.0
     luci_dec = 0.0
@@ -253,25 +255,26 @@ def main(argv):
         global_swarm = sort_swarm(clean_swarm(global_swarm), LEN)
         list_centroid_candidates = get_centroid_list(global_swarm, radius)
         sse = calculate_sum_squared_errors(global_swarm, list_centroid_candidates)
-
-        record_output('cantidad inicial de centroides: ' + str(len(list_centroid_candidates)))
+        terminal_condition = len(list_centroid_candidates)
+        record_output('cantidad inicial de centroides: ' + str(terminal_condition))
     else:
         list_centroid_candidates = None
-        sse = None
+        sse = 0.0
         global_swarm = None
+        terminal_condition = 0
 
-    iteration = 0
-    while len(list_centroid_candidates) > 10:
-
+    terminal_condition = comm.bcast(terminal_condition, root=0)
+    while terminal_condition > 10:
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
             inter_dist = calculate_inter_centroid_distance(global_swarm, list_centroid_candidates)
-
         else:
-            max_internal_dist = None
-            inter_dist = None
+            max_internal_dist = 0.0
+            inter_dist = 0.0
 
-        max_internal_dist, inter_dist, sse = comm.bcast((max_internal_dist, inter_dist, sse), root=0)
+        max_internal_dist = comm.bcast(max_internal_dist, root=0)
+        inter_dist = comm.bcast(inter_dist, root=0)
+        sse = comm.bcast(sse, root=0)
 
         if rank == 0:
             swarm_chunk = get_swarm_chunks(global_swarm, size)
@@ -309,7 +312,10 @@ def main(argv):
             global_swarm = sort_swarm(clean_swarm(global_swarm), FIT)
             list_centroid_candidates = get_centroid_list(global_swarm, radius)
             sse = calculate_sum_squared_errors(global_swarm, list_centroid_candidates)
+
             iteration += 1
+            terminal_condition = len(list_centroid_candidates)
+
             record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
         else:
             global_swarm = None
@@ -317,6 +323,7 @@ def main(argv):
             sse = None
 
         # iteration = comm.bcast(iteration, root=0)
+        terminal_condition = comm.bcast(terminal_condition, root=0)
 
     t_final = MPI.Wtime()
     total_time = comm.reduce(t_final - t_start, op=MPI.MAX)
