@@ -63,14 +63,6 @@ def create_point():
     return np.random.uniform(low=min_values, high=max_values, size=10)
 
 
-# new method from test. TODO: test what happens if datatype is removed.
-def join_subswarms(subswarm1, subswarm2, datatype):
-    for index, worm in enumerate(subswarm2):
-        if subswarm1[index].neighborhood is None:
-            subswarm1[index].neighborhood = subswarm2[index].neighborhood
-    return subswarm1
-
-
 def set_covered_data(local_swarm, tree_data, list_data, radius):
     for worm in local_swarm:
         worm.covered_data = tree_data.query_ball_point(worm.position, radius)
@@ -178,8 +170,8 @@ def record_time(total_time):
 
 
 def main(argv):
-    # FILE_DATA = "poker-hand-training-true.data"
-    FILE_DATA = "test.data"
+    FILE_DATA = "poker-hand-training-true.data"
+    # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
     # FILE_DATA = "tiny_mini_test.data"
 
@@ -270,7 +262,7 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 1:
+    while iteration < 10:
 
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
