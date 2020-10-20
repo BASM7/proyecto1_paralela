@@ -170,10 +170,10 @@ def record_time(total_time):
 
 
 def main(argv):
-    FILE_DATA = "poker-hand-training-true.data"
+    # FILE_DATA = "poker-hand-training-true.data"
     # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
-    # FILE_DATA = "tiny_mini_test.data"
+    FILE_DATA = "tiny_mini_test.data"
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -218,8 +218,8 @@ def main(argv):
     starting_luciferin, luci_dec, luci_inc = comm.bcast((starting_luciferin, luci_dec, luci_inc), root=0)
     worm_step, radius = comm.bcast((worm_step, radius), root=0)
 
-    min_n = int(rank * (len(list_data) * 0.5) / size)
-    max_n = int((rank + 1) * (len(list_data) * 0.5) / size)
+    min_n = int(rank * (len(list_data) * 0.04) / size)
+    max_n = int((rank + 1) * (len(list_data) * 0.04) / size)
 
     local_swarm = []
     for index in range(min_n, max_n):
@@ -261,8 +261,7 @@ def main(argv):
         global_swarm = None
 
     iteration = 0
-    # len(list_centroid_candidates) > 10 and
-    while iteration < 10:
+    while len(list_centroid_candidates) > 10:
 
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
@@ -317,13 +316,15 @@ def main(argv):
             list_centroid_candidates = None
             sse = None
 
-        iteration = comm.bcast(iteration, root=0)
+        # iteration = comm.bcast(iteration, root=0)
 
     t_final = MPI.Wtime()
     total_time = comm.reduce(t_final - t_start, op=MPI.MAX)
 
     if rank == 0:
         record_time(total_time)
+        for centroid in list_centroid_candidates:
+            print(centroid, ' : ', global_swarm[centroid].position)
 
     return
 

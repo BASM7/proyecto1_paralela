@@ -71,8 +71,13 @@ def calculate_new_position(pos1, pos2, worm_step):
 
 
 def main():
-    array = np.array([2.3, 4.5])
-    print(np.multiply(array, (0.03 / 3.1)))
+    points = np.array([[1, 10, 1, 11, 1, 13, 1, 12, 1, 1], [2, 11, 2, 13, 2, 10, 2, 12, 2, 1],
+                       [3, 12, 3, 11, 3, 13, 3, 10, 3, 1], [4, 10, 4, 11, 4, 1, 4, 13, 4, 12],
+                       [4, 1, 4, 13, 4, 12, 4, 11, 4, 10]])
+
+    for point in points:
+        for second_point in points:
+            print(euclidean_distance(point, second_point))
 
 
 if __name__ == '__main__':
