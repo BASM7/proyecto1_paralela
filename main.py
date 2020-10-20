@@ -83,10 +83,6 @@ def set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, radius):
         worm.neighbors_worms = tree_swarm.query_ball_point(worm.position, radius)
         real_neighbors = []
         for index in worm.neighbors_worms:
-            # pdb.set_trace()
-            if global_swarm[index] is None or worm is None:
-                pdb.set_trace()
-
             if global_swarm[index].luciferin > worm.luciferin:
                 real_neighbors.append(index)
         worm.neighbors_worms = np.array(real_neighbors, dtype=int)
@@ -182,8 +178,8 @@ def record_time(total_time):
 
 
 def main(argv):
-    FILE_DATA = "poker-hand-training-true.data"
-    # FILE_DATA = "test.data"
+    # FILE_DATA = "poker-hand-training-true.data"
+    FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
     # FILE_DATA = "tiny_mini_test.data"
 
@@ -230,21 +226,19 @@ def main(argv):
     starting_luciferin, luci_dec, luci_inc = comm.bcast((starting_luciferin, luci_dec, luci_inc), root=0)
     worm_step, radius = comm.bcast((worm_step, radius), root=0)
 
-    min_n = (rank * len(list_data)) // size
-    max_n = ((rank + 1) * len(list_data)) // size
+    min_n = int(rank * (len(list_data) * 0.5) / size)
+    max_n = int((rank + 1) * (len(list_data) * 0.5) / size)
 
     local_swarm = []
     for index in range(min_n, max_n):
-        tiny_worm = Worm(starting_luciferin, create_point())
-        local_swarm.append(tiny_worm)
+        worm = Worm(starting_luciferin, create_point())
+        local_swarm.append(worm)
 
     global_swarm = comm.gather(local_swarm, root=0)
 
     if rank == 0:
         global_swarm = [worm for local_swarm in global_swarm for worm in local_swarm]
         tree_data = KDTree(list_data)
-
-        # pdb.set_trace()
     else:
         tree_data = None
 
@@ -276,7 +270,7 @@ def main(argv):
 
     iteration = 0
     # len(list_centroid_candidates) > 10 and
-    while iteration < 2:
+    while iteration < 1:
 
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
@@ -345,4 +339,4 @@ def main(argv):
 if __name__ == '__main__':
     main(sys.argv[1:])
 
-# mpiexec -n 4 python main.py -r 0.4 -g 0.6 -s 0.03 -i 4.0 -l 5.0
+# mpiexec -n 4 python main.py -r 0.4 -g 0.6 -s 0.03 -i 3.9 -l 5.0
