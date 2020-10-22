@@ -93,14 +93,6 @@ def update_luciferin(local_swarm, luci_dec, luci_inc):
         worm.luciferin = calculate_luciferin(worm, luci_dec, luci_inc)
     return local_swarm
 
-
-# def get_brightest_neighbor(global_swarm, worm):
-#     b_neighbor = -1
-#     for index in worm.neighbors_worms:
-#         if worm.luciferin < global_swarm[index].luciferin:
-#             b_neighbor = index
-#     return b_neighbor
-
 def roulette_selection(probabilites):
     weight_sum = sum(probabilites)
     value = np.random.random() * weight_sum
@@ -182,10 +174,10 @@ def record_time(total_time):
 
 
 def main(argv):
-    # FILE_DATA = "poker-hand-training-true.data"
+    FILE_DATA = "poker-hand-training-true.data"
     # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
-    FILE_DATA = "tiny_mini_test.data"
+    # FILE_DATA = "tiny_mini_test.data"
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
