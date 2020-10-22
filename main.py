@@ -84,7 +84,7 @@ def set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, radius):
 
 def update_fitness(local_swarm, sse, max_inter_dist, cant_data, inter_dist):
     for worm in local_swarm:
-        worm.fitness = calculate_fitness(len(worm), worm.internal_distance, sse, max_inter_dist, cant_data, inter_dist)
+        worm.fitness = calculate_fitness(len(worm), worm.internal_distance, sse, max_inter_dist, cant_data)
     return local_swarm
 
 
@@ -94,24 +94,36 @@ def update_luciferin(local_swarm, luci_dec, luci_inc):
     return local_swarm
 
 
-def get_brightest_neighbor(worm, global_swarm):
-    b_neighbor = -1
-    for index in worm.neighbors_worms:
-        if worm.luciferin < global_swarm[index].luciferin:
-            b_neighbor = index
-    return b_neighbor
+# def get_brightest_neighbor(global_swarm, worm):
+#     b_neighbor = -1
+#     for index in worm.neighbors_worms:
+#         if worm.luciferin < global_swarm[index].luciferin:
+#             b_neighbor = index
+#     return b_neighbor
+
+def roulette_selection(probabilites):
+    weight_sum = sum(probabilites)
+    value = np.random.random() * weight_sum
+    for index, probability in enumerate(probabilites):
+        value -= probability
+        if value <= 0:
+            return index
+    return len(probabilites) - 1
+
+
+def get_brightest_neighbor(global_swarm, worm):
+    probabilities = calculate_probability_neighbors(global_swarm, worm)
+    chosen_index = roulette_selection(probabilities)
+    if worm.neighbors_worms is not None and len(probabilities) > 0:
+        return global_swarm[worm.neighbors_worms[chosen_index]]
+    return None
 
 
 def update_positions_and_data(global_swarm, local_swarm, list_data, worm_step, tree_data, radius):
     for worm in local_swarm:
-        previous_pos = worm.position
-        b_neighbor = get_brightest_neighbor(worm, global_swarm)
-        if b_neighbor == -1:
-            b_worm = worm
-        else:
-            b_worm = global_swarm[b_neighbor]
-        worm.position = calculate_new_position(worm.position, b_worm.position, worm_step)
-        if np.all(previous_pos != worm.position):
+        b_neighbor = get_brightest_neighbor(global_swarm, worm)
+        if b_neighbor is not None:
+            worm.position = calculate_new_position(worm.position, b_neighbor.position, worm_step)
             worm.covered_data = tree_data.query_ball_point(worm.position, radius)
             worm.internal_distance = calculate_intra_distance(worm, list_data)
     return local_swarm
@@ -170,10 +182,10 @@ def record_time(total_time):
 
 
 def main(argv):
-    FILE_DATA = "poker-hand-training-true.data"
+    # FILE_DATA = "poker-hand-training-true.data"
     # FILE_DATA = "test.data"
     # FILE_DATA = "mini_test.data"
-    # FILE_DATA = "tiny_mini_test.data"
+    FILE_DATA = "tiny_mini_test.data"
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -220,8 +232,8 @@ def main(argv):
     starting_luciferin, luci_dec, luci_inc = comm.bcast((starting_luciferin, luci_dec, luci_inc), root=0)
     worm_step, radius = comm.bcast((worm_step, radius), root=0)
 
-    min_n = int(rank * (len(list_data) * 0.04) / size)
-    max_n = int((rank + 1) * (len(list_data) * 0.04) / size)
+    min_n = int(rank * (len(list_data) * 0.1) / size)
+    max_n = int((rank + 1) * (len(list_data) * 0.1) / size)
 
     local_swarm = []
     for index in range(min_n, max_n):
@@ -264,6 +276,7 @@ def main(argv):
         terminal_condition = 0
 
     terminal_condition = comm.bcast(terminal_condition, root=0)
+    # while iteration < 1:
     while terminal_condition > 10:
         if rank == 0:
             max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
@@ -315,6 +328,8 @@ def main(argv):
 
             iteration += 1
             terminal_condition = len(list_centroid_candidates)
+
+            # pdb.set_trace()
 
             record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
         else:

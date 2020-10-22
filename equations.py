@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 
 def euclidean_distance(vector1, vector2):
@@ -18,9 +19,9 @@ def calculate_sum_squared_errors(swarm, centroids_list):
         worm = swarm[index]
         worm_pos = worm.position
         sum_temp = 0
-        if worm.covered_data is not None:
+        if len(worm) > 0:
             for data in worm.covered_data:
-                sum_temp += (euclidean_distance(worm_pos, data) ** 2)
+                sum_temp += (math.sqrt(euclidean_distance(worm_pos, data)))
         sum_total += sum_temp
     return sum_total
 
@@ -31,7 +32,7 @@ def calculate_inter_centroid_distance(swarm, centroid_list):
         worm = swarm[index]
         for s_index in centroid_list:
             second_worm = swarm[s_index]
-            sum_total += (euclidean_distance(worm.position, second_worm.position) ** 2)
+            sum_total += (math.sqrt(euclidean_distance(worm.position, second_worm.position)))
     return sum_total
 
 
@@ -44,7 +45,7 @@ def calculate_max_internal_distance(swarm, centroid_list):
     return max_internal_dist
 
 
-def calculate_fitness(cant_data_cov, int_dist, sse, max_internal_dist, cant_data, inter_dist):
+def calculate_fitness(cant_data_cov, int_dist, sse, max_internal_dist, cant_data, inter_dist=1):
     nominator = inter_dist * (1 / cant_data) * cant_data_cov
     denominator = sse * (int_dist / max_internal_dist)
     new_fitness = nominator / denominator
@@ -55,8 +56,23 @@ def calculate_luciferin(worm, constant_decay, enhancement_fraction):
     return (1 - constant_decay) * worm.luciferin + enhancement_fraction * worm.fitness
 
 
-# def calculate_probability(worm1, worm2):
-#     pass
+def sum_luciferin(global_swarm, worm):
+    sum_luci = 0
+    if worm.neighbors_worms is not None:
+        for index in worm.neighbors_worms:
+            sum_luci += global_swarm[index].luciferin
+    return sum_luci
+
+
+def calculate_probability_neighbors(global_swarm, worm):
+    sum_luci = sum_luciferin(global_swarm, worm)
+    probabilities = []
+    if worm.neighbors_worms is not None:
+        for index in worm.neighbors_worms:
+            neighbor = global_swarm[index]
+            probability = (neighbor.luciferin - worm.luciferin) / (sum_luci - worm.luciferin)
+            probabilities.append(probability)
+    return probabilities
 
 
 def calculate_new_position(pos1, pos2, worm_step):
