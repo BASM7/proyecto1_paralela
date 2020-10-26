@@ -70,13 +70,27 @@ def set_covered_data(local_swarm, tree_data, list_data, radius):
     return local_swarm
 
 
-def set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, radius):
+def pick_centroid(global_swarm, position, centroids):
+    centroids_positions = []
+    for centroid in centroids:
+        centroids_positions.append(global_swarm[centroid].position)
+    centroids_positions = np.array(centroids_positions)
+    tree_centroid = KDTree(centroids_positions)
+    centroid_picked = centroids[tree_centroid.query(position, k=2)[1][1]]
+    # pdb.set_trace()
+    return centroid_picked
+
+
+def set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, centroids, radius):
     for worm in local_swarm:
         worm.neighbors_worms = tree_swarm.query_ball_point(worm.position, radius)
         real_neighbors = []
         for index in worm.neighbors_worms:
             if global_swarm[index].luciferin > worm.luciferin:
                 real_neighbors.append(index)
+        if len(real_neighbors) == 0:
+            real_neighbors.append(pick_centroid(global_swarm, worm.position, centroids))
+            # pdb.set_trace()
         worm.neighbors_worms = np.array(real_neighbors, dtype=int)
     return local_swarm
     pass
@@ -92,6 +106,7 @@ def update_luciferin(local_swarm, luci_dec, luci_inc):
     for worm in local_swarm:
         worm.luciferin = calculate_luciferin(worm, luci_dec, luci_inc)
     return local_swarm
+
 
 def roulette_selection(probabilites):
     weight_sum = sum(probabilites)
@@ -224,8 +239,8 @@ def main(argv):
     starting_luciferin, luci_dec, luci_inc = comm.bcast((starting_luciferin, luci_dec, luci_inc), root=0)
     worm_step, radius = comm.bcast((worm_step, radius), root=0)
 
-    min_n = int(rank * (len(list_data) * 0.1) / size)
-    max_n = int((rank + 1) * (len(list_data) * 0.1) / size)
+    min_n = int(rank * (len(list_data) * 0.04) / size)
+    max_n = int((rank + 1) * (len(list_data) * 0.04) / size)
 
     local_swarm = []
     for index in range(min_n, max_n):
@@ -257,12 +272,12 @@ def main(argv):
         global_swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
 
         global_swarm = sort_swarm(clean_swarm(global_swarm), LEN)
-        list_centroid_candidates = get_centroid_list(global_swarm, radius)
-        sse = calculate_sum_squared_errors(global_swarm, list_centroid_candidates)
-        terminal_condition = len(list_centroid_candidates)
+        list_centroids = get_centroid_list(global_swarm, radius)
+        sse = calculate_sum_squared_errors(global_swarm, list_centroids)
+        terminal_condition = len(list_centroids)
         record_output('cantidad inicial de centroides: ' + str(terminal_condition))
     else:
-        list_centroid_candidates = None
+        list_centroids = None
         sse = 0.0
         global_swarm = None
         terminal_condition = 0
@@ -271,12 +286,13 @@ def main(argv):
     # while iteration < 1:
     while terminal_condition > 10:
         if rank == 0:
-            max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroid_candidates)
-            inter_dist = calculate_inter_centroid_distance(global_swarm, list_centroid_candidates)
+            max_internal_dist = calculate_max_internal_distance(global_swarm, list_centroids)
+            inter_dist = calculate_inter_centroid_distance(global_swarm, list_centroids)
         else:
             max_internal_dist = 0.0
             inter_dist = 0.0
 
+        list_centroids = comm.bcast(list_centroids, root=0)
         max_internal_dist = comm.bcast(max_internal_dist, root=0)
         inter_dist = comm.bcast(inter_dist, root=0)
         sse = comm.bcast(sse, root=0)
@@ -308,25 +324,25 @@ def main(argv):
             swarm_chunk = None
 
         local_swarm = comm.scatter(swarm_chunk, root=0)
-        local_swarm = set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, radius)
+        local_swarm = set_worm_neighborhood(global_swarm, local_swarm, tree_swarm, list_centroids, radius)
         local_swarm = update_positions_and_data(global_swarm, local_swarm, list_data, worm_step, tree_data, radius)
         local_swarm = comm.gather(local_swarm, root=0)
 
         if rank == 0:
             global_swarm = [worm for swarm_chunk in local_swarm for worm in swarm_chunk]
             global_swarm = sort_swarm(clean_swarm(global_swarm), FIT)
-            list_centroid_candidates = get_centroid_list(global_swarm, radius)
-            sse = calculate_sum_squared_errors(global_swarm, list_centroid_candidates)
+            list_centroids = get_centroid_list(global_swarm, radius)
+            sse = calculate_sum_squared_errors(global_swarm, list_centroids)
 
             iteration += 1
-            terminal_condition = len(list_centroid_candidates)
+            terminal_condition = len(list_centroids)
 
             # pdb.set_trace()
 
-            record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroid_candidates)))
+            record_output('i: ' + str(iteration) + ' cantidad de centroides: ' + str(len(list_centroids)))
         else:
             global_swarm = None
-            list_centroid_candidates = None
+            list_centroids = None
             sse = None
 
         # iteration = comm.bcast(iteration, root=0)
@@ -337,7 +353,7 @@ def main(argv):
 
     if rank == 0:
         record_time(total_time)
-        for centroid in list_centroid_candidates:
+        for centroid in list_centroids:
             print(centroid, ' : ', global_swarm[centroid].position)
 
     return

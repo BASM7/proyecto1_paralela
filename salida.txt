@@ -1,1 +1,1 @@
-cantidad inicial de centroides: 25
+cantidad inicial de centroides: 42
